@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>TischTap - Digitale Speisekarte</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="../../turn.min.js"></script>
+
+<style type="text/css">
+:root {
+	--tt-accent: #E8A838;
+	--tt-accent-glow: rgba(232, 168, 56, 0.25);
+	--tt-bg-dark: #0c0c14;
+	--tt-bg-mid: #12121f;
+	--tt-surface: rgba(255, 255, 255, 0.04);
+	--tt-border: rgba(255, 255, 255, 0.07);
+	--tt-text: #f0ece4;
+	--tt-text-muted: rgba(240, 236, 228, 0.35);
+	--tt-text-dim: rgba(240, 236, 228, 0.15);
+	--menu-w: 1152;
+	--menu-h: 752;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+	height: 100%;
+	overflow: hidden;
+	touch-action: manipulation;
+}
+
+body {
+	background: var(--tt-bg-dark);
+	font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+	color: var(--tt-text);
+	display: flex;
+	flex-direction: column;
+}
+
+/* ── Ambient background ── */
+.ambient {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+.ambient .orb {
+	position: absolute;
+	border-radius: 50%;
+	filter: blur(100px);
+	opacity: 0.35;
+}
+.ambient .orb-1 {
+	width: 600px; height: 600px;
+	background: radial-gradient(circle, rgba(232,168,56,0.18), transparent 70%);
+	top: -15%; left: -10%;
+	animation: drift 20s ease-in-out infinite alternate;
+}
+.ambient .orb-2 {
+	width: 500px; height: 500px;
+	background: radial-gradient(circle, rgba(120,80,200,0.12), transparent 70%);
+	bottom: -20%; right: -8%;
+	animation: drift 25s ease-in-out infinite alternate-reverse;
+}
+.ambient .orb-3 {
+	width: 350px; height: 350px;
+	background: radial-gradient(circle, rgba(56,180,232,0.08), transparent 70%);
+	top: 50%; left: 60%;
+	animation: drift 18s ease-in-out 3s infinite alternate;
+}
+.ambient .grain {
+	position: absolute;
+	inset: 0;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+	background-repeat: repeat;
+	opacity: 0.5;
+}
+
+@keyframes drift {
+	from { transform: translate(0, 0) scale(1); }
+	to   { transform: translate(40px, 30px) scale(1.1); }
+}
+
+/* ── Layout ── */
+.app {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	padding: 16px;
+	gap: 16px;
+	overflow: hidden;
+}
+
+/* ── Header / Branding ── */
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	animation: fadeDown 0.7s ease-out;
+	flex-shrink: 0;
+}
+
+.brand-logo {
+	width: 34px;
+	height: 34px;
+	border-radius: 9px;
+	background: linear-gradient(135deg, var(--tt-accent), #d4922e);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: 'DM Serif Display', serif;
+	font-size: 1.1rem;
+	color: var(--tt-bg-dark);
+	font-weight: 700;
+	box-shadow: 0 4px 20px var(--tt-accent-glow);
+}
+
+.brand-text h1 {
+	font-family: 'DM Serif Display', serif;
+	font-size: 1.3rem;
+	font-weight: 400;
+	color: var(--tt-text);
+	letter-spacing: 1px;
+	line-height: 1;
+}
+
+.brand-text span {
+	font-size: 0.6rem;
+	font-weight: 400;
+	letter-spacing: 3px;
+	text-transform: uppercase;
+	color: var(--tt-text-muted);
+}
+
+/* ── Menu viewport (responsive scaling) ── */
+#menu-viewport {
+	position: relative;
+	animation: fadeUp 0.7s ease-out 0.15s both;
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	overflow: hidden;
+}
+
+#menu-scaler {
+	transform-origin: center center;
+	position: relative;
+}
+
+#menu {
+	border-radius: 6px;
+	box-shadow:
+		0 30px 80px rgba(0, 0, 0, 0.6),
+		0 8px 30px rgba(0, 0, 0, 0.4),
+		0 0 0 1px var(--tt-border),
+		inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+#menu .turn-page {
+	background-color: #f7f5f0;
+	background-size: 100% 100%;
+}
+
+/* ── Arrow overlays ── */
+.arrow-overlay {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 56px;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	-webkit-tap-highlight-color: transparent;
+}
+
+#menu-scaler:hover .arrow-overlay,
+.arrow-overlay.touch-visible {
+	opacity: 1;
+}
+
+.arrow-overlay-left {
+	left: 0;
+	border-radius: 6px 0 0 6px;
+	background: linear-gradient(to right, rgba(0,0,0,0.4), transparent);
+}
+
+.arrow-overlay-right {
+	right: 0;
+	border-radius: 0 6px 6px 0;
+	background: linear-gradient(to left, rgba(0,0,0,0.4), transparent);
+}
+
+.arrow-overlay:hover {
+	opacity: 1 !important;
+}
+
+.arrow-overlay:active .arrow-icon {
+	background: rgba(232, 168, 56, 0.85);
+	border-color: var(--tt-accent);
+}
+
+.arrow-overlay .arrow-icon {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	font-size: 1.1rem;
+	transition: all 0.25s ease;
+	box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.arrow-overlay:hover .arrow-icon {
+	background: rgba(232, 168, 56, 0.85);
+	border-color: var(--tt-accent);
+	transform: scale(1.1);
+	box-shadow: 0 4px 24px var(--tt-accent-glow);
+}
+
+/* ── Toolbar ── */
+.toolbar {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 8px 18px;
+	background: var(--tt-surface);
+	border: 1px solid var(--tt-border);
+	border-radius: 40px;
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	animation: fadeUp 0.7s ease-out 0.3s both;
+	flex-shrink: 0;
+}
+
+.tb-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border: none;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--tt-text-muted);
+	font-size: 0.95rem;
+	cursor: pointer;
+	transition: all 0.25s ease;
+}
+.tb-btn:hover {
+	background: rgba(255,255,255,0.06);
+	color: var(--tt-text);
+}
+.tb-btn:active {
+	transform: scale(0.9);
+}
+
+.tb-divider {
+	width: 1px;
+	height: 18px;
+	background: var(--tt-border);
+}
+
+.tb-pages {
+	font-size: 0.75rem;
+	letter-spacing: 1px;
+	color: var(--tt-text-muted);
+	min-width: 70px;
+	text-align: center;
+	user-select: none;
+}
+.tb-pages .pg-current {
+	color: var(--tt-text);
+	font-weight: 600;
+}
+
+.tb-progress {
+	width: 80px;
+	height: 3px;
+	background: rgba(255,255,255,0.06);
+	border-radius: 3px;
+	overflow: hidden;
+}
+.tb-progress-bar {
+	height: 100%;
+	background: var(--tt-accent);
+	border-radius: 3px;
+	transition: width 0.4s ease;
+	width: 12.5%;
+}
+
+.tb-brand {
+	font-size: 0.55rem;
+	letter-spacing: 2px;
+	text-transform: uppercase;
+	color: var(--tt-text-dim);
+	padding: 0 4px;
+	user-select: none;
+}
+
+/* ── Onboarding Wizard ── */
+.wizard-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background: rgba(8, 8, 16, 0.88);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	opacity: 0;
+	animation: wizardIn 0.5s ease-out forwards;
+}
+.wizard-overlay.hiding {
+	animation: wizardOut 0.4s ease-in forwards;
+}
+
+.wizard-card {
+	width: 100%;
+	max-width: 400px;
+	background: var(--tt-bg-mid);
+	border: 1px solid var(--tt-border);
+	border-radius: 20px;
+	padding: 36px 30px 28px;
+	text-align: center;
+	position: relative;
+	box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 60px var(--tt-accent-glow);
+}
+
+.wizard-step { display: none; }
+.wizard-step.active { display: block; }
+
+.wizard-icon {
+	width: 60px;
+	height: 60px;
+	border-radius: 14px;
+	background: rgba(232, 168, 56, 0.08);
+	border: 1px solid rgba(232, 168, 56, 0.15);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0 auto 20px;
+	font-size: 1.5rem;
+}
+
+.wizard-step h2 {
+	font-family: 'DM Serif Display', serif;
+	font-size: 1.3rem;
+	font-weight: 400;
+	margin-bottom: 10px;
+	color: var(--tt-text);
+}
+
+.wizard-step p {
+	font-size: 0.85rem;
+	line-height: 1.65;
+	color: var(--tt-text-muted);
+	margin-bottom: 24px;
+}
+
+.wizard-actions {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+}
+
+.wiz-btn {
+	padding: 10px 24px;
+	border-radius: 10px;
+	border: none;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 0.82rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.25s ease;
+}
+
+.wiz-btn-primary {
+	background: var(--tt-accent);
+	color: var(--tt-bg-dark);
+}
+.wiz-btn-primary:hover {
+	background: #f0b448;
+	box-shadow: 0 4px 24px var(--tt-accent-glow);
+	transform: translateY(-1px);
+}
+
+.wiz-btn-ghost {
+	background: transparent;
+	color: var(--tt-text-muted);
+	border: 1px solid var(--tt-border);
+}
+.wiz-btn-ghost:hover {
+	background: rgba(255,255,255,0.04);
+	color: var(--tt-text);
+}
+
+.wizard-dots {
+	display: flex;
+	gap: 6px;
+	justify-content: center;
+	margin-top: 20px;
+}
+.wizard-dots .dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: rgba(255,255,255,0.1);
+	transition: all 0.3s ease;
+}
+.wizard-dots .dot.active {
+	background: var(--tt-accent);
+	width: 18px;
+	border-radius: 3px;
+}
+
+.wizard-hint-graphic {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	margin: 16px 0 8px;
+	font-size: 0.72rem;
+	color: var(--tt-text-muted);
+}
+
+.hint-key {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 34px;
+	height: 30px;
+	padding: 0 8px;
+	border: 1px solid rgba(255,255,255,0.12);
+	border-radius: 6px;
+	background: rgba(255,255,255,0.04);
+	font-size: 0.72rem;
+	color: var(--tt-text);
+	font-family: 'DM Sans', sans-serif;
+}
+
+.hint-swipe-anim {
+	width: 60px;
+	height: 60px;
+	position: relative;
+	margin: 0 auto 8px;
+}
+.hint-swipe-anim .hand {
+	position: absolute;
+	font-size: 1.6rem;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	animation: swipeHand 2s ease-in-out infinite;
+}
+
+@keyframes swipeHand {
+	0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+	50% { transform: translate(-50%, -50%) translateX(-20px); }
+}
+
+@keyframes wizardIn {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+@keyframes wizardOut {
+	from { opacity: 1; }
+	to   { opacity: 0; }
+}
+
+@keyframes fadeDown {
+	from { opacity: 0; transform: translateY(-16px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+	from { opacity: 0; transform: translateY(16px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+	.app { padding: 12px; gap: 10px; }
+	.brand { gap: 10px; }
+	.brand-text h1 { font-size: 1.1rem; }
+	.brand-logo { width: 30px; height: 30px; font-size: 0.95rem; border-radius: 8px; }
+	.toolbar { gap: 8px; padding: 6px 12px; }
+	.tb-btn { width: 32px; height: 32px; font-size: 0.85rem; }
+	.tb-pages { font-size: 0.7rem; min-width: 60px; }
+	.tb-progress { width: 50px; }
+	.tb-brand { display: none; }
+	.tb-divider:last-of-type { display: none; }
+	.arrow-overlay { width: 48px; }
+	.arrow-overlay .arrow-icon { width: 36px; height: 36px; font-size: 0.95rem; }
+	.wizard-card { padding: 28px 22px 24px; }
+	.wizard-step h2 { font-size: 1.1rem; }
+	.wizard-step p { font-size: 0.8rem; }
+	.wizard-hint-graphic { gap: 10px; }
+}
+
+@media (max-width: 400px) {
+	.brand-text span { letter-spacing: 2px; font-size: 0.55rem; }
+	.toolbar { gap: 6px; padding: 5px 10px; }
+	.tb-progress { width: 40px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Ambient background -->
+<div class="ambient">
+	<div class="orb orb-1"></div>
+	<div class="orb orb-2"></div>
+	<div class="orb orb-3"></div>
+	<div class="grain"></div>
+</div>
+
+<!-- Onboarding Wizard -->
+<div class="wizard-overlay" id="wizard">
+	<div class="wizard-card">
+		<!-- Schritt 1: Willkommen -->
+		<div class="wizard-step active" data-step="1">
+			<div class="wizard-icon">
+				<span style="font-size:1.3rem; font-family:'DM Serif Display',serif; color:var(--tt-accent); font-weight:700;">Tt</span>
+			</div>
+			<h2>Willkommen bei TischTap</h2>
+			<p>Entdecken Sie unsere digitale Speisekarte. Bl&auml;ttern Sie durch die Seiten wie in einem echten Men&uuml; &ndash; einfach und elegant.</p>
+			<div class="wizard-actions">
+				<button class="wiz-btn wiz-btn-ghost" id="wiz-skip">&Uuml;berspringen</button>
+				<button class="wiz-btn wiz-btn-primary" id="wiz-next-1">Los geht's</button>
+			</div>
+		</div>
+
+		<!-- Schritt 2: Klicken / Pfeiltasten -->
+		<div class="wizard-step" data-step="2">
+			<div class="wizard-icon">&#9205;</div>
+			<h2>Klicken oder Pfeiltasten</h2>
+			<p>Klicken Sie auf die Pfeile links und rechts neben dem Men&uuml;, um zu bl&auml;ttern. Auf der Tastatur k&ouml;nnen Sie auch die Pfeiltasten verwenden.</p>
+			<div class="wizard-hint-graphic">
+				<span class="hint-key">&#8592;</span>
+				<span>Zur&uuml;ck</span>
+				<span style="color:rgba(255,255,255,0.08);">|</span>
+				<span class="hint-key">&#8594;</span>
+				<span>Weiter</span>
+			</div>
+			<div class="wizard-actions" style="margin-top:20px;">
+				<button class="wiz-btn wiz-btn-ghost wiz-back">Zur&uuml;ck</button>
+				<button class="wiz-btn wiz-btn-primary wiz-next">Weiter</button>
+			</div>
+		</div>
+
+		<!-- Schritt 3: Wischen -->
+		<div class="wizard-step" data-step="3">
+			<div class="wizard-icon" style="border:none; background:none;">
+				<div class="hint-swipe-anim">
+					<div class="hand">&#128076;</div>
+				</div>
+			</div>
+			<h2>Wischen zum Bl&auml;ttern</h2>
+			<p>Auf Touch-Ger&auml;ten k&ouml;nnen Sie nach links oder rechts wischen, um die Seiten nat&uuml;rlich umzubl&auml;ttern. Ziehen Sie an einer Seitenecke, um einen Blick auf die n&auml;chste Seite zu werfen.</p>
+			<div class="wizard-actions">
+				<button class="wiz-btn wiz-btn-ghost wiz-back">Zur&uuml;ck</button>
+				<button class="wiz-btn wiz-btn-primary wiz-next">Weiter</button>
+			</div>
+		</div>
+
+		<!-- Schritt 4: Fertig -->
+		<div class="wizard-step" data-step="4">
+			<div class="wizard-icon">&#10024;</div>
+			<h2>Alles bereit!</h2>
+			<p>Viel Spa&szlig; beim St&ouml;bern in unserem Men&uuml;. Sie k&ouml;nnen jederzeit per Klick, Wischen, Pfeiltasten oder &uuml;ber die Leiste unten navigieren.</p>
+			<div class="wizard-actions">
+				<button class="wiz-btn wiz-btn-primary" id="wiz-start">Men&uuml; ansehen</button>
+			</div>
+		</div>
+
+		<div class="wizard-dots">
+			<div class="dot active" data-dot="1"></div>
+			<div class="dot" data-dot="2"></div>
+			<div class="dot" data-dot="3"></div>
+			<div class="dot" data-dot="4"></div>
+		</div>
+	</div>
+</div>
+
+<!-- App -->
+<div class="app">
+	<div class="brand">
+		<div class="brand-logo">Tt</div>
+		<div class="brand-text">
+			<h1>TischTap</h1>
+			<span>Digitale Speisekarte</span>
+		</div>
+	</div>
+
+	<div id="menu-viewport">
+		<div id="menu-scaler">
+			<div id="menu">
+				<div style="background-image:url(pages/1.png);"></div>
+				<div style="background-image:url(pages/2.png);"></div>
+				<div style="background-image:url(pages/3.png);"></div>
+				<div style="background-image:url(pages/4.png);"></div>
+				<div style="background-image:url(pages/5.png);"></div>
+				<div style="background-image:url(pages/6.png);"></div>
+				<div style="background-image:url(pages/7.png);"></div>
+				<div style="background-image:url(pages/8.png);"></div>
+			</div>
+			<!-- Arrow overlays (inside scaler so they scale with the menu) -->
+			<div class="arrow-overlay arrow-overlay-left" id="arrow-left">
+				<div class="arrow-icon">&#8592;</div>
+			</div>
+			<div class="arrow-overlay arrow-overlay-right" id="arrow-right">
+				<div class="arrow-icon">&#8594;</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="toolbar">
+		<button class="tb-btn" id="prev-btn" title="Vorherige Seite">&#8592;</button>
+		<div class="tb-divider"></div>
+		<div class="tb-pages">
+			<span>Seite </span>
+			<span class="pg-current" id="current-page">1</span>
+			<span> / </span>
+			<span id="total-pages">8</span>
+		</div>
+		<div class="tb-progress">
+			<div class="tb-progress-bar" id="progress-bar"></div>
+		</div>
+		<div class="tb-divider"></div>
+		<button class="tb-btn" id="next-btn" title="N&auml;chste Seite">&#8594;</button>
+		<div class="tb-divider"></div>
+		<span class="tb-brand">TischTap</span>
+	</div>
+</div>
+
+<script type="text/javascript">
+$(document).ready(function() {
+	var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+	var $menu = $('#menu');
+	var $scaler = $('#menu-scaler');
+	var $viewport = $('#menu-viewport');
+
+	// Single page dimensions (one page of the menu)
+	var PAGE_W = 576;
+	var PAGE_H = 752;
+	var MOBILE_BREAKPOINT = 768;
+
+	var currentDisplay = null; // track current display mode
+
+	function isMobile() {
+		return window.innerWidth <= MOBILE_BREAKPOINT;
+	}
+
+	// ── Initialize or reinitialize Turn.js ──
+	function initTurn() {
+		var wantDisplay = isMobile() ? 'single' : 'double';
+
+		// If already initialized with the same mode, just rescale
+		if (currentDisplay === wantDisplay) {
+			scaleMenu();
+			return;
+		}
+
+		// Destroy previous instance if exists
+		var currentPage = 1;
+		if (currentDisplay !== null) {
+			currentPage = $menu.turn('page');
+			$menu.turn('destroy');
+		}
+
+		currentDisplay = wantDisplay;
+		var menuW = (wantDisplay === 'single') ? PAGE_W : PAGE_W * 2;
+		var menuH = PAGE_H;
+
+		// Set the actual dimensions on the elements
+		$menu.css({ width: menuW + 'px', height: menuH + 'px' });
+		$scaler.css({ width: menuW + 'px', height: menuH + 'px' });
+
+		$menu.turn({
+			display: wantDisplay,
+			width: menuW,
+			height: menuH,
+			acceleration: true,
+			gradients: !isTouch,
+			elevation: 50,
+			page: currentPage,
+			when: {
+				turned: function(e, page) {
+					updatePageIndicator();
+				}
+			}
+		});
+
+		scaleMenu();
+		updatePageIndicator();
+	}
+
+	// ── Responsive scaling ──
+	function scaleMenu() {
+		var menuW = (currentDisplay === 'single') ? PAGE_W : PAGE_W * 2;
+		var menuH = PAGE_H;
+
+		var availW = $viewport.width();
+		var availH = $viewport.height();
+
+		if (availW <= 0 || availH <= 0) return;
+
+		var scaleX = availW / menuW;
+		var scaleY = availH / menuH;
+		var s = Math.min(scaleX, scaleY, 1);
+
+		$scaler.css('transform', 'scale(' + s + ')');
+	}
+
+	// Debounced resize handler to switch single/double and rescale
+	var resizeTimer;
+	$(window).on('resize', function() {
+		clearTimeout(resizeTimer);
+		resizeTimer = setTimeout(initTurn, 150);
+	});
+
+	// Initial setup
+	initTurn();
+
+	// ── Arrow overlays ──
+	$('#arrow-left').on('click touchend', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		$menu.turn('previous');
+	});
+	$('#arrow-right').on('click touchend', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		$menu.turn('next');
+	});
+
+	// On touch devices, always show arrows (they're the primary nav)
+	if (isTouch) {
+		$('.arrow-overlay').addClass('touch-visible');
+	}
+
+	// ── Swipe support ──
+	(function() {
+		var startX = 0;
+		var startY = 0;
+		var tracking = false;
+		var el = document.getElementById('menu');
+
+		el.addEventListener('touchstart', function(e) {
+			var touch = e.touches[0];
+			startX = touch.clientX;
+			startY = touch.clientY;
+			tracking = true;
+		}, { passive: true });
+
+		el.addEventListener('touchend', function(e) {
+			if (!tracking) return;
+			tracking = false;
+			var touch = e.changedTouches[0];
+			var dx = touch.clientX - startX;
+			var dy = touch.clientY - startY;
+
+			if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+				if (dx < 0) {
+					$menu.turn('next');
+				} else {
+					$menu.turn('previous');
+				}
+			}
+		}, { passive: true });
+
+		// Mouse-drag swipe for desktop
+		var mouseDown = false;
+		var mouseStartX = 0;
+
+		el.addEventListener('mousedown', function(e) {
+			mouseDown = true;
+			mouseStartX = e.clientX;
+		});
+
+		el.addEventListener('mouseup', function(e) {
+			if (!mouseDown) return;
+			mouseDown = false;
+			var dx = e.clientX - mouseStartX;
+
+			if (Math.abs(dx) > 60) {
+				if (dx < 0) {
+					$menu.turn('next');
+				} else {
+					$menu.turn('previous');
+				}
+			}
+		});
+
+		el.addEventListener('mouseleave', function() {
+			mouseDown = false;
+		});
+	})();
+
+	// ── Page indicator ──
+	function updatePageIndicator() {
+		var page = $menu.turn('page');
+		var pages = $menu.turn('pages');
+		$('#current-page').text(page);
+		$('#total-pages').text(pages);
+
+		var progress = (page / pages) * 100;
+		$('#progress-bar').css('width', progress + '%');
+	}
+
+	$('#prev-btn').on('click', function() {
+		$menu.turn('previous');
+	});
+
+	$('#next-btn').on('click', function() {
+		$menu.turn('next');
+	});
+
+	// ── Keyboard navigation ──
+	$(window).on('keydown', function(e) {
+		if ($('#wizard').is(':visible')) return;
+		if (e.keyCode === 37) $menu.turn('previous');
+		else if (e.keyCode === 39) $menu.turn('next');
+	});
+
+	// ── Onboarding Wizard ──
+	var wizardShown = localStorage.getItem('tischtap_wizard_done');
+	if (wizardShown) {
+		$('#wizard').remove();
+	}
+
+	var currentStep = 1;
+	var totalSteps = 4;
+
+	function goToStep(step) {
+		if (step < 1 || step > totalSteps) return;
+		currentStep = step;
+		$('.wizard-step').removeClass('active');
+		$('.wizard-step[data-step="' + step + '"]').addClass('active');
+		$('.wizard-dots .dot').removeClass('active');
+		$('.wizard-dots .dot[data-dot="' + step + '"]').addClass('active');
+	}
+
+	function closeWizard() {
+		localStorage.setItem('tischtap_wizard_done', '1');
+		$('#wizard').addClass('hiding');
+		setTimeout(function() {
+			$('#wizard').remove();
+		}, 400);
+	}
+
+	$('#wiz-skip').on('click', closeWizard);
+	$('#wiz-start').on('click', closeWizard);
+	$('#wiz-next-1').on('click', function() { goToStep(2); });
+
+	$(document).on('click', '.wiz-next', function() {
+		goToStep(currentStep + 1);
+	});
+	$(document).on('click', '.wiz-back', function() {
+		goToStep(currentStep - 1);
+	});
+});
+</script>
+
+</body>
+</html>
