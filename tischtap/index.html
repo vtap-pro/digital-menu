@@ -1,0 +1,1618 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+	<title>TischTap - Digitaler Produktkatalog</title>
+	<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+	<link rel="shortcut icon" href="./favicon.svg">
+	<link rel="apple-touch-icon" href="./icon.svg">
+	<link
+		href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap"
+		rel="stylesheet">
+	<script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
+	<script type="text/javascript" src="./turn.min.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+	<style type="text/css">
+		:root {
+			--tt-accent: #AB1E03;
+			--tt-accent-glow: rgba(171, 30, 3, 0.25);
+			--tt-bg-dark: #0c0c14;
+			--tt-bg-mid: #12121f;
+			--tt-surface: rgba(255, 255, 255, 0.04);
+			--tt-border: rgba(255, 255, 255, 0.07);
+			--tt-text: #f0ece4;
+			--tt-text-muted: rgba(240, 236, 228, 0.35);
+			--tt-text-dim: rgba(240, 236, 228, 0.15);
+		}
+
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			height: 100%;
+			overflow: hidden;
+			touch-action: manipulation;
+		}
+
+		body {
+			background: var(--tt-bg-dark);
+			font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+			color: var(--tt-text);
+			display: flex;
+			flex-direction: column;
+		}
+
+		/* ── Ambient background ── */
+		.ambient {
+			position: fixed;
+			inset: 0;
+			z-index: 0;
+			pointer-events: none;
+			overflow: hidden;
+		}
+
+		.ambient .orb {
+			position: absolute;
+			border-radius: 50%;
+			filter: blur(100px);
+			opacity: 0.35;
+		}
+
+		.ambient .orb-1 {
+			width: 600px;
+			height: 600px;
+			background: radial-gradient(circle, rgba(232, 168, 56, 0.18), transparent 70%);
+			top: -15%;
+			left: -10%;
+			animation: drift 20s ease-in-out infinite alternate;
+		}
+
+		.ambient .orb-2 {
+			width: 500px;
+			height: 500px;
+			background: radial-gradient(circle, rgba(120, 80, 200, 0.12), transparent 70%);
+			bottom: -20%;
+			right: -8%;
+			animation: drift 25s ease-in-out infinite alternate-reverse;
+		}
+
+		.ambient .orb-3 {
+			width: 350px;
+			height: 350px;
+			background: radial-gradient(circle, rgba(56, 180, 232, 0.08), transparent 70%);
+			top: 50%;
+			left: 60%;
+			animation: drift 18s ease-in-out 3s infinite alternate;
+		}
+
+		.ambient .grain {
+			position: absolute;
+			inset: 0;
+			background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+			background-repeat: repeat;
+			opacity: 0.5;
+		}
+
+		@keyframes drift {
+			from {
+				transform: translate(0, 0) scale(1);
+			}
+
+			to {
+				transform: translate(40px, 30px) scale(1.1);
+			}
+		}
+
+		/* ── Layout ── */
+		.app {
+			position: relative;
+			z-index: 1;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			flex: 1;
+			padding: 16px;
+			gap: 16px;
+			overflow: hidden;
+		}
+
+		/* ── Header / Branding ── */
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			animation: fadeDown 0.7s ease-out;
+			flex-shrink: 0;
+		}
+
+		.brand-logo {
+			width: 34px;
+			height: 34px;
+			border-radius: 9px;
+			background: rgba(255, 255, 255, 0.98);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			overflow: hidden;
+			box-shadow: 0 4px 20px var(--tt-accent-glow);
+		}
+
+		.brand-logo img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+		}
+
+		.brand-text h1 {
+			font-family: 'DM Serif Display', serif;
+			font-size: 1.3rem;
+			font-weight: 400;
+			color: var(--tt-text);
+			letter-spacing: 1px;
+			line-height: 1;
+		}
+
+		.brand-text span {
+			font-size: 0.6rem;
+			font-weight: 400;
+			letter-spacing: 3px;
+			text-transform: uppercase;
+			color: var(--tt-text-muted);
+		}
+
+		/* ── Menu viewport ── */
+		#menu-viewport {
+			position: relative;
+			animation: fadeUp 0.7s ease-out 0.15s both;
+			flex: 1 1 auto;
+			min-height: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 100%;
+			overflow: hidden;
+			touch-action: none;
+		}
+
+		#menu-zoom {
+			position: relative;
+			transform-origin: center center;
+			will-change: transform;
+		}
+
+		#menu-zoom.is-zoomed {
+			cursor: grab;
+		}
+
+		#menu-zoom.is-panning {
+			cursor: grabbing;
+		}
+
+		#menu {
+			border-radius: 6px;
+			cursor: grab;
+			box-shadow:
+				0 30px 80px rgba(0, 0, 0, 0.6),
+				0 8px 30px rgba(0, 0, 0, 0.4),
+				0 0 0 1px var(--tt-border),
+				inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+		}
+
+		#menu.is-dragging {
+			cursor: grabbing;
+		}
+
+		#menu-zoom.is-zoomed #menu {
+			cursor: inherit;
+		}
+
+		#menu .turn-page {
+			background-color: #f7f5f0;
+			background-size: 100% 100%;
+		}
+
+		.menu-page {
+			background: #f7f5f0;
+			overflow: hidden;
+		}
+
+		.menu-page img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: fill;
+			user-select: none;
+			-webkit-user-drag: none;
+		}
+
+		.loader {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: min(420px, calc(100vw - 32px));
+			min-height: 220px;
+			border: 1px solid var(--tt-border);
+			border-radius: 14px;
+			background: rgba(18, 18, 31, 0.82);
+			box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+			text-align: center;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+		}
+
+		.loader h2 {
+			margin-bottom: 10px;
+			font-family: 'DM Serif Display', serif;
+			font-size: 1.3rem;
+			font-weight: 400;
+		}
+
+		.loader p {
+			color: var(--tt-text-muted);
+			font-size: 0.85rem;
+			line-height: 1.6;
+		}
+
+		.loader a {
+			color: var(--tt-accent);
+			text-decoration: none;
+		}
+
+		.loader-bar {
+			width: 210px;
+			height: 4px;
+			margin: 20px auto 0;
+			overflow: hidden;
+			border-radius: 99px;
+			background: rgba(255, 255, 255, 0.08);
+		}
+
+		.loader-bar span {
+			display: block;
+			width: 10%;
+			height: 100%;
+			border-radius: inherit;
+			background: var(--tt-accent);
+			transition: width 0.25s ease;
+		}
+
+		/* ── Arrow overlays ── */
+		.arrow-overlay {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 56px;
+			z-index: 10;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			opacity: 0;
+			transition: opacity 0.3s ease;
+			-webkit-tap-highlight-color: transparent;
+		}
+
+		#menu-viewport:hover .arrow-overlay,
+		.arrow-overlay.touch-visible {
+			opacity: 1;
+		}
+
+		#menu-viewport.is-zoomed .arrow-overlay {
+			opacity: 0 !important;
+			pointer-events: none;
+		}
+
+		.arrow-overlay-left {
+			left: 0;
+			border-radius: 6px 0 0 6px;
+			background: linear-gradient(to right, rgba(0, 0, 0, 0.4), transparent);
+		}
+
+		.arrow-overlay-right {
+			right: 0;
+			border-radius: 0 6px 6px 0;
+			background: linear-gradient(to left, rgba(0, 0, 0, 0.4), transparent);
+		}
+
+		.arrow-overlay:hover {
+			opacity: 1 !important;
+		}
+
+		.arrow-overlay:active .arrow-icon {
+			background: rgba(232, 168, 56, 0.85);
+			border-color: var(--tt-accent);
+		}
+
+		.arrow-overlay .arrow-icon {
+			width: 40px;
+			height: 40px;
+			border-radius: 50%;
+			background: rgba(0, 0, 0, 0.55);
+			border: 1px solid rgba(255, 255, 255, 0.18);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: #fff;
+			font-size: 1.1rem;
+			transition: all 0.25s ease;
+			box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		}
+
+		.arrow-overlay:hover .arrow-icon {
+			background: rgba(232, 168, 56, 0.85);
+			border-color: var(--tt-accent);
+			transform: scale(1.1);
+			box-shadow: 0 4px 24px var(--tt-accent-glow);
+		}
+
+		/* ── Toolbar ── */
+		.toolbar {
+			display: flex;
+			align-items: center;
+			gap: 14px;
+			padding: 8px 18px;
+			background: var(--tt-surface);
+			border: 1px solid var(--tt-border);
+			border-radius: 40px;
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			animation: fadeUp 0.7s ease-out 0.3s both;
+			flex-shrink: 0;
+		}
+
+		.tb-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 36px;
+			height: 36px;
+			border: none;
+			border-radius: 50%;
+			background: transparent;
+			color: var(--tt-text-muted);
+			font-size: 0.95rem;
+			cursor: pointer;
+			transition: all 0.25s ease;
+		}
+
+		.tb-btn:hover {
+			background: rgba(255, 255, 255, 0.06);
+			color: var(--tt-text);
+		}
+
+		.tb-btn:active {
+			transform: scale(0.9);
+		}
+
+		.tb-divider {
+			width: 1px;
+			height: 18px;
+			background: var(--tt-border);
+		}
+
+		.tb-pages {
+			font-size: 0.75rem;
+			letter-spacing: 1px;
+			color: var(--tt-text-muted);
+			min-width: 70px;
+			text-align: center;
+			user-select: none;
+		}
+
+		.tb-pages .pg-current {
+			color: var(--tt-text);
+			font-weight: 600;
+		}
+
+		.tb-progress {
+			width: 80px;
+			height: 3px;
+			background: rgba(255, 255, 255, 0.06);
+			border-radius: 3px;
+			overflow: hidden;
+		}
+
+		.tb-progress-bar {
+			height: 100%;
+			background: var(--tt-accent);
+			border-radius: 3px;
+			transition: width 0.4s ease;
+			width: 12.5%;
+		}
+
+		.tb-brand {
+			font-size: 0.55rem;
+			letter-spacing: 2px;
+			text-transform: uppercase;
+			color: var(--tt-text-dim);
+			padding: 0 4px;
+			user-select: none;
+		}
+
+		/* ── Onboarding Wizard ── */
+		.wizard-overlay {
+			position: fixed;
+			inset: 0;
+			z-index: 1000;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+			background: rgba(8, 8, 16, 0.88);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			opacity: 0;
+			animation: wizardIn 0.5s ease-out forwards;
+		}
+
+		.wizard-overlay.hiding {
+			animation: wizardOut 0.4s ease-in forwards;
+		}
+
+		.wizard-card {
+			width: 100%;
+			max-width: 400px;
+			background: var(--tt-bg-mid);
+			border: 1px solid var(--tt-border);
+			border-radius: 20px;
+			padding: 36px 30px 28px;
+			text-align: center;
+			position: relative;
+			box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 60px var(--tt-accent-glow);
+		}
+
+		.wizard-step {
+			display: none;
+		}
+
+		.wizard-step.active {
+			display: block;
+		}
+
+		.wizard-icon {
+			width: 60px;
+			height: 60px;
+			border-radius: 14px;
+			background: rgba(232, 168, 56, 0.08);
+			border: 1px solid rgba(232, 168, 56, 0.15);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin: 0 auto 20px;
+			font-size: 1.5rem;
+		}
+
+		.wizard-step h2 {
+			font-family: 'DM Serif Display', serif;
+			font-size: 1.3rem;
+			font-weight: 400;
+			margin-bottom: 10px;
+			color: var(--tt-text);
+		}
+
+		.wizard-step p {
+			font-size: 0.85rem;
+			line-height: 1.65;
+			color: var(--tt-text-muted);
+			margin-bottom: 24px;
+		}
+
+		.wizard-actions {
+			display: flex;
+			gap: 10px;
+			justify-content: center;
+		}
+
+		.wiz-btn {
+			padding: 10px 24px;
+			border-radius: 10px;
+			border: none;
+			font-family: 'DM Sans', sans-serif;
+			font-size: 0.82rem;
+			font-weight: 500;
+			cursor: pointer;
+			transition: all 0.25s ease;
+		}
+
+		.wiz-btn-primary {
+			background: var(--tt-accent);
+			color: var(--tt-bg-dark);
+		}
+
+		.wiz-btn-primary:hover {
+			background: #f0b448;
+			box-shadow: 0 4px 24px var(--tt-accent-glow);
+			transform: translateY(-1px);
+		}
+
+		.wiz-btn-ghost {
+			background: transparent;
+			color: var(--tt-text-muted);
+			border: 1px solid var(--tt-border);
+		}
+
+		.wiz-btn-ghost:hover {
+			background: rgba(255, 255, 255, 0.04);
+			color: var(--tt-text);
+		}
+
+		.wizard-dots {
+			display: flex;
+			gap: 6px;
+			justify-content: center;
+			margin-top: 20px;
+		}
+
+		.wizard-dots .dot {
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: rgba(255, 255, 255, 0.1);
+			transition: all 0.3s ease;
+		}
+
+		.wizard-dots .dot.active {
+			background: var(--tt-accent);
+			width: 18px;
+			border-radius: 3px;
+		}
+
+		.wizard-hint-graphic {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 16px;
+			margin: 16px 0 8px;
+			font-size: 0.72rem;
+			color: var(--tt-text-muted);
+		}
+
+		.hint-key {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 34px;
+			height: 30px;
+			padding: 0 8px;
+			border: 1px solid rgba(255, 255, 255, 0.12);
+			border-radius: 6px;
+			background: rgba(255, 255, 255, 0.04);
+			font-size: 0.72rem;
+			color: var(--tt-text);
+			font-family: 'DM Sans', sans-serif;
+		}
+
+		.hint-swipe-anim {
+			width: 60px;
+			height: 60px;
+			position: relative;
+			margin: 0 auto 8px;
+		}
+
+		.hint-swipe-anim .hand {
+			position: absolute;
+			font-size: 1.6rem;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			animation: swipeHand 2s ease-in-out infinite;
+		}
+
+		@keyframes swipeHand {
+
+			0%,
+			100% {
+				transform: translate(-50%, -50%) translateX(0);
+			}
+
+			50% {
+				transform: translate(-50%, -50%) translateX(-20px);
+			}
+		}
+
+		@keyframes wizardIn {
+			from {
+				opacity: 0;
+			}
+
+			to {
+				opacity: 1;
+			}
+		}
+
+		@keyframes wizardOut {
+			from {
+				opacity: 1;
+			}
+
+			to {
+				opacity: 0;
+			}
+		}
+
+		@keyframes fadeDown {
+			from {
+				opacity: 0;
+				transform: translateY(-16px);
+			}
+
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		@keyframes fadeUp {
+			from {
+				opacity: 0;
+				transform: translateY(16px);
+			}
+
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		/* ── Responsive: Tablet ── */
+		@media (max-width: 768px) {
+			.app {
+				padding: 12px;
+				gap: 10px;
+			}
+
+			.brand {
+				gap: 10px;
+			}
+
+			.brand-text h1 {
+				font-size: 1.1rem;
+			}
+
+			.brand-logo {
+				width: 30px;
+				height: 30px;
+				font-size: 0.95rem;
+				border-radius: 8px;
+			}
+
+			.toolbar {
+				gap: 8px;
+				padding: 6px 12px;
+			}
+
+			.tb-btn {
+				width: 32px;
+				height: 32px;
+				font-size: 0.85rem;
+			}
+
+			.tb-pages {
+				font-size: 0.7rem;
+				min-width: 60px;
+			}
+
+			.tb-progress {
+				width: 50px;
+			}
+
+			.tb-brand {
+				display: none;
+			}
+
+			.tb-divider:last-of-type {
+				display: none;
+			}
+
+			.arrow-overlay {
+				width: 48px;
+			}
+
+			.arrow-overlay .arrow-icon {
+				width: 36px;
+				height: 36px;
+				font-size: 0.95rem;
+			}
+
+			.wizard-card {
+				padding: 28px 22px 24px;
+			}
+
+			.wizard-step h2 {
+				font-size: 1.1rem;
+			}
+
+			.wizard-step p {
+				font-size: 0.8rem;
+			}
+
+			.wizard-hint-graphic {
+				gap: 10px;
+			}
+		}
+
+		/* ── Responsive: Phone ── */
+		@media (max-width: 480px) {
+			.app {
+				padding: 8px 4px;
+				gap: 6px;
+				justify-content: flex-start;
+				padding-top: env(safe-area-inset-top, 8px);
+				padding-bottom: env(safe-area-inset-bottom, 4px);
+			}
+
+			.brand {
+				gap: 8px;
+			}
+
+			.brand-logo {
+				width: 26px;
+				height: 26px;
+				font-size: 0.8rem;
+				border-radius: 6px;
+			}
+
+			.brand-text h1 {
+				font-size: 0.95rem;
+			}
+
+			.brand-text span {
+				letter-spacing: 2px;
+				font-size: 0.5rem;
+			}
+
+			#menu {
+				border-radius: 4px;
+				box-shadow:
+					0 10px 30px rgba(0, 0, 0, 0.5),
+					0 0 0 1px var(--tt-border);
+			}
+
+			.arrow-overlay {
+				width: 40px;
+			}
+
+			.arrow-overlay .arrow-icon {
+				width: 30px;
+				height: 30px;
+				font-size: 0.8rem;
+				background: rgba(0, 0, 0, 0.45);
+				border: 1px solid rgba(255, 255, 255, 0.12);
+			}
+
+			.toolbar {
+				gap: 6px;
+				padding: 5px 10px;
+				border-radius: 30px;
+			}
+
+			.tb-btn {
+				width: 28px;
+				height: 28px;
+				font-size: 0.8rem;
+			}
+
+			.tb-pages {
+				font-size: 0.65rem;
+				min-width: 50px;
+			}
+
+			.tb-progress {
+				width: 36px;
+			}
+
+			.tb-brand {
+				display: none;
+			}
+
+			.tb-divider:last-of-type {
+				display: none;
+			}
+
+			.wizard-overlay {
+				padding: 16px;
+			}
+
+			.wizard-card {
+				padding: 24px 18px 20px;
+				border-radius: 16px;
+				max-width: 340px;
+			}
+
+			.wizard-icon {
+				width: 48px;
+				height: 48px;
+				border-radius: 12px;
+				font-size: 1.2rem;
+				margin-bottom: 16px;
+			}
+
+			.wizard-step h2 {
+				font-size: 1rem;
+			}
+
+			.wizard-step p {
+				font-size: 0.75rem;
+				margin-bottom: 18px;
+			}
+
+			.wiz-btn {
+				padding: 9px 18px;
+				font-size: 0.78rem;
+			}
+
+			.wizard-hint-graphic {
+				gap: 8px;
+				font-size: 0.65rem;
+			}
+
+			.hint-key {
+				min-width: 28px;
+				height: 26px;
+				font-size: 0.65rem;
+			}
+		}
+
+		/* ── Ambient on phones ── */
+		@media (max-width: 480px) {
+			.ambient .orb-1 {
+				width: 300px;
+				height: 300px;
+			}
+
+			.ambient .orb-2 {
+				width: 250px;
+				height: 250px;
+			}
+
+			.ambient .orb-3 {
+				width: 180px;
+				height: 180px;
+			}
+		}
+
+		/* ── Responsive: Very small phones ── */
+		@media (max-width: 360px) {
+			.brand-text h1 {
+				font-size: 0.85rem;
+			}
+
+			.brand-logo {
+				width: 24px;
+				height: 24px;
+				font-size: 0.75rem;
+			}
+
+			.toolbar {
+				gap: 4px;
+				padding: 4px 8px;
+			}
+
+			.tb-btn {
+				width: 26px;
+				height: 26px;
+			}
+
+			.tb-progress {
+				width: 30px;
+			}
+
+			.tb-pages {
+				min-width: 44px;
+				font-size: 0.6rem;
+			}
+		}
+
+		/* ── Landscape phone ── */
+		@media (max-height: 500px) and (orientation: landscape) {
+			.brand {
+				display: none;
+			}
+
+			.app {
+				padding: 4px;
+				gap: 4px;
+			}
+
+			.toolbar {
+				padding: 4px 10px;
+			}
+
+			.tb-btn {
+				width: 26px;
+				height: 26px;
+			}
+		}
+	</style>
+</head>
+
+<body>
+
+	<!-- Ambient background -->
+	<div class="ambient">
+		<div class="orb orb-1"></div>
+		<div class="orb orb-2"></div>
+		<div class="orb orb-3"></div>
+		<div class="grain"></div>
+	</div>
+
+	<!-- Onboarding Wizard -->
+	<div class="wizard-overlay" id="wizard">
+		<div class="wizard-card">
+			<!-- Schritt 1: Willkommen -->
+			<div class="wizard-step active" data-step="1">
+				<div class="wizard-icon">
+					<span
+						style="font-size:1.3rem; font-family:'DM Serif Display',serif; color:var(--tt-accent); font-weight:700;">Tt</span>
+				</div>
+				<h2>Willkommen bei TischTap</h2>
+				<p>Entdecken Sie unsere digitale Speisekarte. Bl&auml;ttern Sie durch die Seiten wie in einem echten
+					Men&uuml; &ndash; einfach und elegant.</p>
+				<div class="wizard-actions">
+					<button class="wiz-btn wiz-btn-ghost" id="wiz-skip">&Uuml;berspringen</button>
+					<button class="wiz-btn wiz-btn-primary" id="wiz-next-1">Los geht's</button>
+				</div>
+			</div>
+
+			<!-- Schritt 2: Klicken / Pfeiltasten -->
+			<div class="wizard-step" data-step="2">
+				<div class="wizard-icon">&#9205;</div>
+				<h2>Klicken oder Pfeiltasten</h2>
+				<p>Klicken Sie auf die Pfeile links und rechts neben dem Men&uuml;, um zu bl&auml;ttern. Auf der
+					Tastatur k&ouml;nnen Sie auch die Pfeiltasten verwenden.</p>
+				<div class="wizard-hint-graphic">
+					<span class="hint-key">&#8592;</span>
+					<span>Zur&uuml;ck</span>
+					<span style="color:rgba(255,255,255,0.08);">|</span>
+					<span class="hint-key">&#8594;</span>
+					<span>Weiter</span>
+				</div>
+				<div class="wizard-actions" style="margin-top:20px;">
+					<button class="wiz-btn wiz-btn-ghost wiz-back">Zur&uuml;ck</button>
+					<button class="wiz-btn wiz-btn-primary wiz-next">Weiter</button>
+				</div>
+			</div>
+
+			<!-- Schritt 3: Wischen -->
+			<div class="wizard-step" data-step="3">
+				<div class="wizard-icon" style="border:none; background:none;">
+					<div class="hint-swipe-anim">
+						<div class="hand">&#128076;</div>
+					</div>
+				</div>
+				<h2>Wischen zum Bl&auml;ttern</h2>
+				<p>Auf Touch-Ger&auml;ten k&ouml;nnen Sie nach links oder rechts wischen, um die Seiten nat&uuml;rlich
+					umzubl&auml;ttern. Ziehen Sie an einer Seitenecke, um einen Blick auf die n&auml;chste Seite zu
+					werfen.</p>
+				<div class="wizard-actions">
+					<button class="wiz-btn wiz-btn-ghost wiz-back">Zur&uuml;ck</button>
+					<button class="wiz-btn wiz-btn-primary wiz-next">Weiter</button>
+				</div>
+			</div>
+
+			<!-- Schritt 4: Fertig -->
+			<div class="wizard-step" data-step="4">
+				<div class="wizard-icon">&#10024;</div>
+				<h2>Alles bereit!</h2>
+				<p>Viel Spa&szlig; beim St&ouml;bern in unserem Men&uuml;. Sie k&ouml;nnen jederzeit per Klick, Wischen,
+					Pfeiltasten oder &uuml;ber die Leiste unten navigieren.</p>
+				<div class="wizard-actions">
+					<button class="wiz-btn wiz-btn-primary" id="wiz-start">Men&uuml; ansehen</button>
+				</div>
+			</div>
+
+			<div class="wizard-dots">
+				<div class="dot active" data-dot="1"></div>
+				<div class="dot" data-dot="2"></div>
+				<div class="dot" data-dot="3"></div>
+				<div class="dot" data-dot="4"></div>
+			</div>
+		</div>
+	</div>
+
+	<!-- App -->
+	<div class="app">
+		<div class="brand">
+			<div class="brand-logo">
+				<img src="./icon.svg" alt="TischTap Logo">
+			</div>
+			<div class="brand-text">
+				<h1>TischTap</h1>
+				<span>Digitaler Produktkatalog</span>
+			</div>
+		</div>
+
+		<div id="menu-viewport">
+			<div class="loader" id="loader">
+				<div>
+					<h2>Katalog wird geladen</h2>
+					<p id="loader-text">PDF wird vorbereitet...</p>
+					<div class="loader-bar"><span id="loader-progress"></span></div>
+				</div>
+			</div>
+			<div id="menu-zoom">
+				<div id="menu"></div>
+			</div>
+			<!-- Arrow overlays -->
+			<div class="arrow-overlay arrow-overlay-left" id="arrow-left">
+				<div class="arrow-icon">&#8592;</div>
+			</div>
+			<div class="arrow-overlay arrow-overlay-right" id="arrow-right">
+				<div class="arrow-icon">&#8594;</div>
+			</div>
+		</div>
+
+		<div class="toolbar">
+			<button class="tb-btn" id="prev-btn" title="Vorherige Seite">&#8592;</button>
+			<div class="tb-divider"></div>
+			<div class="tb-pages">
+				<span>Seite </span>
+				<span class="pg-current" id="current-page">0</span>
+				<span> / </span>
+				<span id="total-pages">0</span>
+			</div>
+			<div class="tb-progress">
+				<div class="tb-progress-bar" id="progress-bar"></div>
+			</div>
+			<div class="tb-divider"></div>
+			<button class="tb-btn" id="next-btn" title="N&auml;chste Seite">&#8594;</button>
+			<div class="tb-divider"></div>
+			<span class="tb-brand">TischTap</span>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		$(document).ready(function () {
+			var PDF_URL = './tischtap-catalogue-v1.pdf';
+			var PDF_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+			var TARGET_PAGE_WIDTH = 1200;
+			var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+			var $menu = $('#menu');
+			var $zoom = $('#menu-zoom');
+			var $viewport = $('#menu-viewport');
+			var $loader = $('#loader');
+			var $loaderText = $('#loader-text');
+			var $loaderProgress = $('#loader-progress');
+
+			// Original page aspect ratio (single page)
+			var PAGE_RATIO = 595 / 842;
+			var MOBILE_BREAKPOINT = 768;
+
+			var currentDisplay = null; // track current display mode
+			var initialized = false;
+			var totalPdfPages = 0;
+			var zoomState = {
+				scale: 1,
+				x: 0,
+				y: 0,
+				maxScale: 3,
+				pinchStartDistance: 0,
+				pinchStartScale: 1,
+				pinchCenter: null
+			};
+			var panState = null;
+			var suppressZoomClick = false;
+
+			if (window.pdfjsLib) {
+				pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
+			}
+
+			function isMobile() {
+				return window.innerWidth <= MOBILE_BREAKPOINT;
+			}
+
+			function setLoading(message, percent) {
+				$loaderText.text(message);
+				$loaderProgress.css('width', Math.max(8, Math.min(100, percent)) + '%');
+			}
+
+			function showPdfError(message) {
+				$menu.hide();
+				$loader.html(
+					'<div>' +
+					'<h2>Katalog konnte nicht geladen werden</h2>' +
+					'<p>' + message + '<br><a href="' + PDF_URL + '">PDF direkt oeffnen</a></p>' +
+					'</div>'
+				).show();
+			}
+
+			function isZoomed() {
+				return zoomState.scale > 1.01;
+			}
+
+			function clamp(value, min, max) {
+				return Math.max(min, Math.min(max, value));
+			}
+
+			function clampZoomPosition() {
+				if (!initialized) {
+					zoomState.x = 0;
+					zoomState.y = 0;
+					return;
+				}
+
+				var viewportWidth = $viewport.width();
+				var viewportHeight = $viewport.height();
+				var menuWidth = $zoom.outerWidth();
+				var menuHeight = $zoom.outerHeight();
+				var maxX = Math.max(0, ((menuWidth * zoomState.scale) - viewportWidth) / 2);
+				var maxY = Math.max(0, ((menuHeight * zoomState.scale) - viewportHeight) / 2);
+
+				zoomState.x = clamp(zoomState.x, -maxX, maxX);
+				zoomState.y = clamp(zoomState.y, -maxY, maxY);
+			}
+
+			function applyZoom() {
+				clampZoomPosition();
+				$zoom.css('transform', 'translate(' + zoomState.x + 'px, ' + zoomState.y + 'px) scale(' + zoomState.scale + ')');
+				$zoom.toggleClass('is-zoomed', isZoomed());
+				$viewport.toggleClass('is-zoomed', isZoomed());
+			}
+
+			function zoomAt(clientX, clientY, nextScale) {
+				if (!initialized) return;
+
+				var viewportRect = $viewport[0].getBoundingClientRect();
+				var centerX = viewportRect.left + (viewportRect.width / 2);
+				var centerY = viewportRect.top + (viewportRect.height / 2);
+				var contentX = (clientX - centerX - zoomState.x) / zoomState.scale;
+				var contentY = (clientY - centerY - zoomState.y) / zoomState.scale;
+
+				nextScale = clamp(nextScale, 1, zoomState.maxScale);
+				zoomState.x = clientX - centerX - (contentX * nextScale);
+				zoomState.y = clientY - centerY - (contentY * nextScale);
+				zoomState.scale = nextScale;
+
+				if (!isZoomed()) {
+					zoomState.scale = 1;
+					zoomState.x = 0;
+					zoomState.y = 0;
+				}
+
+				applyZoom();
+			}
+
+			function resetZoom() {
+				zoomState.scale = 1;
+				zoomState.x = 0;
+				zoomState.y = 0;
+				applyZoom();
+			}
+
+			function distanceBetweenTouches(touches) {
+				var dx = touches[0].clientX - touches[1].clientX;
+				var dy = touches[0].clientY - touches[1].clientY;
+				return Math.sqrt((dx * dx) + (dy * dy));
+			}
+
+			function centerBetweenTouches(touches) {
+				return {
+					x: (touches[0].clientX + touches[1].clientX) / 2,
+					y: (touches[0].clientY + touches[1].clientY) / 2
+				};
+			}
+
+			// ── Calculate menu size to fit viewport ──
+			function calcSize(display) {
+				var availW = $viewport.width();
+				var availH = $viewport.height();
+				if (availW <= 0 || availH <= 0) return null;
+
+				// In single mode, one page fills the width; in double, two pages side by side
+				var pages = (display === 'single') ? 1 : 2;
+				var menuRatio = (PAGE_RATIO * pages); // menu width/height ratio
+
+				var w, h;
+				if (availW / availH > menuRatio) {
+					// Viewport is wider than menu ratio — fit by height
+					h = availH;
+					w = Math.floor(h * menuRatio);
+				} else {
+					// Viewport is taller — fit by width
+					w = availW;
+					h = Math.floor(w / menuRatio);
+				}
+
+				return { width: w, height: h };
+			}
+
+			// ── Initialize or update Turn.js ──
+			function initTurn() {
+				var wantDisplay = isMobile() ? 'single' : 'double';
+				var size = calcSize(wantDisplay);
+				if (!size) return;
+
+				if (!initialized) {
+					// First init
+					currentDisplay = wantDisplay;
+					$menu.show();
+					$zoom.css({ width: size.width, height: size.height });
+					$menu.turn({
+						display: wantDisplay,
+						width: size.width,
+						height: size.height,
+						acceleration: true,
+						gradients: !isTouch,
+						elevation: 50,
+						when: {
+							turned: function (e, page) {
+								updatePageIndicator();
+							}
+						}
+					});
+					initialized = true;
+					$loader.hide();
+					applyZoom();
+					updatePageIndicator();
+					return;
+				}
+
+				// Display mode changed — switch it
+				if (currentDisplay !== wantDisplay) {
+					currentDisplay = wantDisplay;
+					$menu.turn('display', wantDisplay);
+				}
+
+				// Resize using turn.js native size() method
+				$zoom.css({ width: size.width, height: size.height });
+				$menu.turn('size', size.width, size.height);
+				applyZoom();
+				updatePageIndicator();
+			}
+
+			// Debounced resize handler
+			var resizeTimer;
+			$(window).on('resize', function () {
+				clearTimeout(resizeTimer);
+				resizeTimer = setTimeout(initTurn, 100);
+			});
+
+			function renderPdfPage(pdf, pageNumber) {
+				return pdf.getPage(pageNumber).then(function (page) {
+					var baseViewport = page.getViewport({ scale: 1 });
+					if (pageNumber === 1) {
+						PAGE_RATIO = baseViewport.width / baseViewport.height;
+					}
+
+					var scale = TARGET_PAGE_WIDTH / baseViewport.width;
+					var viewport = page.getViewport({ scale: scale });
+					var canvas = document.createElement('canvas');
+					var context = canvas.getContext('2d');
+
+					canvas.width = Math.floor(viewport.width);
+					canvas.height = Math.floor(viewport.height);
+
+					return page.render({
+						canvasContext: context,
+						viewport: viewport
+					}).promise.then(function () {
+						var image = document.createElement('img');
+						image.src = canvas.toDataURL('image/jpeg', 0.92);
+						image.alt = 'TischTap Katalog Seite ' + pageNumber;
+						image.loading = 'eager';
+
+						var pageEl = document.createElement('div');
+						pageEl.className = 'menu-page';
+						pageEl.appendChild(image);
+						$menu.append(pageEl);
+
+						setLoading('Seite ' + pageNumber + ' von ' + totalPdfPages + ' wird gerendert...', (pageNumber / totalPdfPages) * 100);
+					});
+				});
+			}
+
+			function loadPdfCatalogue() {
+				if (!window.pdfjsLib) {
+					showPdfError('PDF.js ist nicht verfuegbar.');
+					return;
+				}
+
+				$menu.hide();
+				setLoading('PDF wird vorbereitet...', 10);
+
+				pdfjsLib.getDocument(PDF_URL).promise.then(function (pdf) {
+					totalPdfPages = pdf.numPages;
+					$('#total-pages').text(totalPdfPages);
+
+					var chain = Promise.resolve();
+					for (var pageNumber = 1; pageNumber <= totalPdfPages; pageNumber++) {
+						(function (number) {
+							chain = chain.then(function () {
+								return renderPdfPage(pdf, number);
+							});
+						})(pageNumber);
+					}
+
+					return chain;
+				}).then(function () {
+					initTurn();
+				}).catch(function (error) {
+					showPdfError(error && error.message ? error.message : 'Bitte versuchen Sie es erneut.');
+				});
+			}
+
+			// Initial setup
+			loadPdfCatalogue();
+
+			// ── Arrow overlays ──
+			$('#arrow-left').on('click touchend', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!initialized) return;
+				$menu.turn('previous');
+			});
+			$('#arrow-right').on('click touchend', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!initialized) return;
+				$menu.turn('next');
+			});
+
+			// On touch devices, always show arrows
+			if (isTouch) {
+				$('.arrow-overlay').addClass('touch-visible');
+			}
+
+			// ── Zoom, pan and page-drag support ──
+			var dragState = null;
+
+			function getDragPoint(e) {
+				var original = e.originalEvent || e;
+				var touch = original.changedTouches && original.changedTouches.length ? original.changedTouches[0] : null;
+				var activeTouch = original.touches && original.touches.length ? original.touches[0] : null;
+				var point = touch || activeTouch || original;
+
+				return {
+					x: point.clientX,
+					y: point.clientY
+				};
+			}
+
+			function startMenuDrag(e) {
+				if (!initialized) return;
+				if (e.which && e.which !== 1) return;
+				if ((e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1)) return;
+
+				var point = getDragPoint(e);
+				if (isZoomed()) {
+					panState = {
+						active: true,
+						startX: point.x,
+						startY: point.y,
+						originX: zoomState.x,
+						originY: zoomState.y,
+						moved: false
+					};
+					$zoom.addClass('is-panning');
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					return;
+				}
+
+				dragState = {
+					active: true,
+					startX: point.x,
+					startY: point.y,
+					moved: false
+				};
+				$menu.addClass('is-dragging');
+			}
+
+			function moveMenuDrag(e) {
+				if (panState && panState.active) {
+					var panPoint = getDragPoint(e);
+					var panDx = panPoint.x - panState.startX;
+					var panDy = panPoint.y - panState.startY;
+
+					if (Math.abs(panDx) > 3 || Math.abs(panDy) > 3) {
+						panState.moved = true;
+					}
+
+					zoomState.x = panState.originX + panDx;
+					zoomState.y = panState.originY + panDy;
+					applyZoom();
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					return;
+				}
+
+				if (!dragState || !dragState.active) return;
+
+				var point = getDragPoint(e);
+				var dx = point.x - dragState.startX;
+				var dy = point.y - dragState.startY;
+
+				if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+					dragState.moved = true;
+					e.preventDefault();
+				}
+			}
+
+			function endMenuDrag(e) {
+				if (panState && panState.active) {
+					if (panState.moved) {
+						suppressZoomClick = true;
+						setTimeout(function () {
+							suppressZoomClick = false;
+						}, 250);
+					}
+
+					panState = null;
+					$zoom.removeClass('is-panning');
+					return;
+				}
+
+				if (!dragState || !dragState.active) return;
+
+				var point = getDragPoint(e);
+				var dx = point.x - dragState.startX;
+				var dy = point.y - dragState.startY;
+
+				if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+					suppressZoomClick = true;
+					if (dx < 0) {
+						$menu.turn('next');
+					} else {
+						$menu.turn('previous');
+					}
+					setTimeout(function () {
+						suppressZoomClick = false;
+					}, 250);
+				}
+
+				dragState = null;
+				$menu.removeClass('is-dragging');
+			}
+
+			function cancelMenuDrag() {
+				dragState = null;
+				panState = null;
+				$menu.removeClass('is-dragging');
+				$zoom.removeClass('is-panning');
+			}
+
+			function startPinchZoom(e) {
+				if (!initialized) return;
+				var original = e.originalEvent;
+				if (!original || !original.touches || original.touches.length !== 2) return;
+
+				dragState = null;
+				panState = null;
+				$menu.removeClass('is-dragging');
+				$zoom.addClass('is-panning');
+
+				zoomState.pinchStartDistance = distanceBetweenTouches(original.touches);
+				zoomState.pinchStartScale = zoomState.scale;
+				zoomState.pinchCenter = centerBetweenTouches(original.touches);
+				e.preventDefault();
+				e.stopImmediatePropagation();
+			}
+
+			function movePinchZoom(e) {
+				var original = e.originalEvent;
+				if (!original || !original.touches || original.touches.length !== 2 || !zoomState.pinchStartDistance) return;
+
+				var distance = distanceBetweenTouches(original.touches);
+				var center = centerBetweenTouches(original.touches);
+				var nextScale = zoomState.pinchStartScale * (distance / zoomState.pinchStartDistance);
+
+				zoomAt(center.x, center.y, nextScale);
+				suppressZoomClick = true;
+				e.preventDefault();
+				e.stopImmediatePropagation();
+			}
+
+			function endPinchZoom(e) {
+				var original = e.originalEvent;
+				if (original && original.touches && original.touches.length > 0) return;
+
+				zoomState.pinchStartDistance = 0;
+				zoomState.pinchCenter = null;
+				$zoom.removeClass('is-panning');
+				setTimeout(function () {
+					suppressZoomClick = false;
+				}, 250);
+			}
+
+			function handleDesktopZoomClick(e) {
+				if (!initialized || isTouch || suppressZoomClick) return;
+
+				if (isZoomed()) {
+					resetZoom();
+				} else {
+					zoomAt(e.clientX, e.clientY, 2);
+				}
+			}
+
+			$menu.on('mousedown touchstart', startMenuDrag);
+			$(document).on('mousemove touchmove', moveMenuDrag);
+			$(document).on('mouseup touchend', endMenuDrag);
+			$(document).on('mouseleave touchcancel', cancelMenuDrag);
+			$viewport.on('touchstart', startPinchZoom);
+			$viewport.on('touchmove', movePinchZoom);
+			$viewport.on('touchend touchcancel', endPinchZoom);
+			$zoom.on('click', handleDesktopZoomClick);
+
+			// ── Page indicator ──
+			function updatePageIndicator() {
+				if (!initialized) return;
+				var page = $menu.turn('page');
+				var pages = $menu.turn('pages');
+				$('#current-page').text(page);
+				$('#total-pages').text(pages);
+
+				var progress = (page / pages) * 100;
+				$('#progress-bar').css('width', progress + '%');
+			}
+
+			$('#prev-btn').on('click', function () {
+				if (!initialized) return;
+				$menu.turn('previous');
+			});
+
+			$('#next-btn').on('click', function () {
+				if (!initialized) return;
+				$menu.turn('next');
+			});
+
+			// ── Keyboard navigation ──
+			$(window).on('keydown', function (e) {
+				if (!initialized) return;
+				if ($('#wizard').is(':visible')) return;
+				if (e.keyCode === 37) $menu.turn('previous');
+				else if (e.keyCode === 39) $menu.turn('next');
+			});
+
+			// ── Onboarding Wizard ──
+			var wizardShown = localStorage.getItem('tischtap_wizard_done');
+			if (wizardShown) {
+				$('#wizard').remove();
+			}
+
+			var currentStep = 1;
+			var totalSteps = 4;
+
+			function goToStep(step) {
+				if (step < 1 || step > totalSteps) return;
+				currentStep = step;
+				$('.wizard-step').removeClass('active');
+				$('.wizard-step[data-step="' + step + '"]').addClass('active');
+				$('.wizard-dots .dot').removeClass('active');
+				$('.wizard-dots .dot[data-dot="' + step + '"]').addClass('active');
+			}
+
+			function closeWizard() {
+				localStorage.setItem('tischtap_wizard_done', '1');
+				$('#wizard').addClass('hiding');
+				setTimeout(function () {
+					$('#wizard').remove();
+				}, 400);
+			}
+
+			$('#wiz-skip').on('click', closeWizard);
+			$('#wiz-start').on('click', closeWizard);
+			$('#wiz-next-1').on('click', function () { goToStep(2); });
+
+			$(document).on('click', '.wiz-next', function () {
+				goToStep(currentStep + 1);
+			});
+			$(document).on('click', '.wiz-back', function () {
+				goToStep(currentStep - 1);
+			});
+		});
+	</script>
+
+</body>
+
+</html>
